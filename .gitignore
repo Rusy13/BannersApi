@@ -1,0 +1,5 @@
+.env
+.database/postgres/data/
+.idea
+internal/app/server.crt
+internal/app/server.key

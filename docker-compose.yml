@@ -1,0 +1,42 @@
+version: '3.8'
+services:
+  avito-app:
+    build: ./
+    command:
+      - "./avito-app"
+      - "test-migration-up"  # Добавленная команда для запуска миграций
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    depends_on:
+      - db
+    environment:
+      - HOST=db
+      - PORT=5432
+      - POSTGRES_USER=postgres
+      - PASSWORD=1111
+      - DBNAME=Avito
+
+
+  db:
+    restart: always
+    image: postgres:latest
+    volumes:
+      - ./.database/postgres/data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1111
+      POSTGRES_DB: Avito
+
+
+  test-db:
+    restart: always
+    image: postgres:latest
+    ports:
+      - "5433:5432"  # Используем другой порт для тестовой базы данных
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1111
+      POSTGRES_DB: TestAvito  # Имя тестовой базы данных может отличаться
