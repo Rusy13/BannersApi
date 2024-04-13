@@ -9,8 +9,6 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"os"
-	"strconv"
 	"strings"
 )
 
@@ -21,16 +19,25 @@ const (
 
 func Run() {
 
-	port, err := strconv.Atoi(os.Getenv("PORT"))
-	if err != nil {
-		log.Fatal("Failed to convert PORT to integer:", err)
-	}
+	//port, err := strconv.Atoi(os.Getenv("PORT"))
+	//if err != nil {
+	//	log.Fatal("Failed to convert PORT to integer:", err)
+	//}
+	//config := config.StorageConfig{
+	//	Host:     os.Getenv("HOST"),
+	//	Port:     port,
+	//	Username: os.Getenv("POSTGRES_USER"),
+	//	Password: os.Getenv("PASSWORD"),
+	//	Database: os.Getenv("DBNAME"),
+	//}
+	//-----------------------------------------------
+	//	без докера
 	config := config.StorageConfig{
-		Host:     os.Getenv("HOST"),
-		Port:     port,
-		Username: os.Getenv("POSTGRES_USER"),
-		Password: os.Getenv("PASSWORD"),
-		Database: os.Getenv("DBNAME"),
+		Host:     "localhost",
+		Port:     5432,
+		Username: "postgres",
+		Password: "1111",
+		Database: "Avito",
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -54,7 +61,9 @@ func serveSecure(implementation api.Server1) {
 	secureMux.Handle("/", routes.CreateRouter(implementation))
 
 	log.Printf("Listening on port %s...\n", securePort)
-	if err := http.ListenAndServeTLS(securePort, "internal/app/server.crt", "internal/app/server.key", secureMux); err != nil {
+	//if err := http.ListenAndServeTLS(securePort, "internal/app/server.crt", "internal/app/server.key", secureMux); err != nil {               ------------------------docker
+	if err := http.ListenAndServeTLS(securePort, "../../internal/app/server.crt", "../../internal/app/server.key", secureMux); err != nil {
+
 		log.Fatal(err)
 	}
 }

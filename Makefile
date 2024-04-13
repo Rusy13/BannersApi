@@ -3,8 +3,11 @@ ifeq ($(POSTGRES_SETUP_TEST),)
 endif
 
 ifeq ($(POSTGRES_SETUP),)
-    POSTGRES_SETUP := user=postgres password=1111 dbname=Avito host=db port=5432 sslmode=disable
+#    POSTGRES_SETUP := user=postgres password=1111 dbname=Avito host=db port=5432 sslmode=disable
+    POSTGRES_SETUP := user=postgres password=1111 dbname=Avito host=localhost port=5432 sslmode=disable
+
 endif
+
 
 
 INTERNAL_PKG_PATH=$(CURDIR)/internal/storage

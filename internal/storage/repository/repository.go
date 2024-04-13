@@ -8,4 +8,5 @@ type BannerRepo interface {
 	CreateBanner(ctx context.Context, banner *Banner) (int64, error)
 	UpdateBanner(ctx context.Context, bannerID int64, banner *Banner) error
 	DeleteBanner(ctx context.Context, bannerID int64) error
+	UpdateFeatureTags(ctx context.Context, bannerID int64, featureID int, tagIDs []int) error
 }

@@ -3,8 +3,6 @@
 
 CREATE TABLE banners (
      id SERIAL PRIMARY KEY,
-     tag_id INT NOT NULL,
-     feature_id INT NOT NULL,
      content JSONB NOT NULL,
      is_active BOOLEAN NOT NULL,
      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

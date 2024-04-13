@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	errs "Avito/internal/config/errors"
 	"Avito/internal/storage/repository"
 	"encoding/json"
+	"errors"
+	"github.com/gorilla/mux"
+	"log"
 	"net/http"
 	"strconv"
-
-	"github.com/gorilla/mux"
 )
 
 type Server1 struct {
@@ -24,44 +26,43 @@ type BannerResponse struct {
 }
 
 func (s *Server1) GetUserBanner(w http.ResponseWriter, req *http.Request) {
+
+	// Извлечение параметров запроса
 	tagID, err := strconv.ParseInt(req.URL.Query().Get("tag_id"), 10, 64)
 	if err != nil {
-		http.Error(w, "Invalid tag_id", http.StatusBadRequest)
+		http.Error(w, "Invalid tag ID", http.StatusBadRequest)
 		return
 	}
+
 	featureID, err := strconv.ParseInt(req.URL.Query().Get("feature_id"), 10, 64)
 	if err != nil {
-		http.Error(w, "Invalid feature_id", http.StatusBadRequest)
+		http.Error(w, "Invalid feature ID", http.StatusBadRequest)
 		return
 	}
+
 	useLastRevision, err := strconv.ParseBool(req.URL.Query().Get("use_last_revision"))
 	if err != nil {
-		http.Error(w, "Invalid use_last_revision", http.StatusBadRequest)
-		return
+		useLastRevision = false
 	}
 
-	// You need to implement this function to retrieve the banner for the user
+	// Получение баннера пользователя из репозитория
 	banner, err := s.Repo.GetUserBanner(req.Context(), tagID, featureID, useLastRevision)
 	if err != nil {
-		http.Error(w, "Эхх", http.StatusBadRequest)
-
-		//switch {
-		//case errors.Is(err, repository.ErrUnauthorized):
-		//	http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		//case errors.Is(err, repository.ErrForbidden):
-		//	http.Error(w, "Forbidden", http.StatusForbidden)
-		//case errors.Is(err, repository.ErrBannerNotFound):
-		//	http.Error(w, "Banner not found", http.StatusNotFound)
-		//default:
-		//	http.Error(w, "Internal server error", http.StatusInternalServerError)
-		//}
+		log.Println("Error fetching user banner:", err) // Добавленная строка
+		if errors.Is(err, errs.ErrBannerNotFound) {
+			http.Error(w, "Banner not found", http.StatusNotFound)
+		} else {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
 		return
 	}
 
+	// Отправка баннера в формате JSON
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(banner)
 }
 
+// SSSSSSSSSSSSSSSSSSSSSSSSSSSSIIIIIIIIIIIIIIIIIIIIIIIIIIIIUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU
 func (s *Server1) GetBanners(w http.ResponseWriter, req *http.Request) {
 	token := req.Header.Get("token")
 	if token != "admin_token" {
@@ -69,22 +70,25 @@ func (s *Server1) GetBanners(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// Parsing request parameters
 	featureID, _ := strconv.ParseInt(req.URL.Query().Get("feature_id"), 10, 64)
 	tagID, _ := strconv.ParseInt(req.URL.Query().Get("tag_id"), 10, 64)
 	limit, _ := strconv.Atoi(req.URL.Query().Get("limit"))
 	offset, _ := strconv.Atoi(req.URL.Query().Get("offset"))
 
-	// You need to implement this function to retrieve banners with filtering
+	// Retrieving banners from the repository
 	banners, err := s.Repo.GetBanners(req.Context(), featureID, tagID, limit, offset)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
+	// Returning a successful response with banners in JSON format
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(banners)
 }
 
+// SSSSSSSSSSSSSSSSSSSSSSSSSSSSIIIIIIIIIIIIIIIIIIIIIIIIIIIIUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU
 func (s *Server1) CreateBanner(w http.ResponseWriter, req *http.Request) {
 	token := req.Header.Get("token")
 	if token != "admin_token" {
@@ -93,10 +97,12 @@ func (s *Server1) CreateBanner(w http.ResponseWriter, req *http.Request) {
 	}
 
 	var banner repository.Banner
+	log.Println(banner)
 	if err := json.NewDecoder(req.Body).Decode(&banner); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
+	log.Println(banner)
 
 	// You need to implement this function to create a new banner
 	bannerID, err := s.Repo.CreateBanner(req.Context(), &banner)
@@ -109,6 +115,7 @@ func (s *Server1) CreateBanner(w http.ResponseWriter, req *http.Request) {
 	json.NewEncoder(w).Encode(map[string]int64{"banner_id": bannerID})
 }
 
+// ---------------------------
 func (s *Server1) UpdateBanner(w http.ResponseWriter, req *http.Request) {
 	token := req.Header.Get("token")
 	if token != "admin_token" {
@@ -125,16 +132,17 @@ func (s *Server1) UpdateBanner(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// You need to implement this function to update the banner
+	// Обновляем баннер
 	err := s.Repo.UpdateBanner(req.Context(), bannerID, &banner)
 	if err != nil {
-		http.Error(w, "Эхх", http.StatusBadRequest)
-		//switch {
-		//case errors.Is(err, repository.ErrBannerNotFound):
-		//	http.Error(w, "Banner not found", http.StatusNotFound)
-		//default:
-		//	http.Error(w, "Internal server error", http.StatusInternalServerError)
-		//}
+		http.Error(w, "Failed to update banner", http.StatusInternalServerError)
+		return
+	}
+
+	// Теперь обновляем теги
+	err = s.Repo.UpdateFeatureTags(req.Context(), bannerID, banner.FeatureID, banner.TagIDs)
+	if err != nil {
+		http.Error(w, "Failed to update feature tags", http.StatusInternalServerError)
 		return
 	}
 

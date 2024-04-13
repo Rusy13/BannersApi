@@ -16,7 +16,7 @@ type Database struct {
 
 type PGX interface {
 	DBops
-	BeginTx(ctx context.Context, options *pgx.TxOptions) error
+	BeginTx(ctx context.Context, options pgx.TxOptions) (pgx.Tx, error)
 }
 
 type DBops interface {
@@ -31,9 +31,12 @@ func newDatabase(cluster *pgxpool.Pool) *Database {
 	return &Database{cluster: cluster}
 }
 
-func (db Database) BeginTx(ctx context.Context, options *pgx.TxOptions) error {
-
-	return nil
+func (db *Database) BeginTx(ctx context.Context, options pgx.TxOptions) (pgx.Tx, error) {
+	tx, err := db.cluster.BeginTx(ctx, options)
+	if err != nil {
+		return nil, err
+	}
+	return tx, nil
 }
 
 func (db Database) GetPool(_ context.Context) *pgxpool.Pool {

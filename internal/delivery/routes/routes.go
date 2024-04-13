@@ -29,7 +29,7 @@ func CreateRouter(implemetation handlers.Server1) *mux.Router {
 			fmt.Println("error")
 		}
 	})
-	router.HandleFunc(fmt.Sprintf("/banner/{id}", queryParamKey), func(w http.ResponseWriter, req *http.Request) {
+	router.HandleFunc("/banner/{id}", func(w http.ResponseWriter, req *http.Request) {
 		switch req.Method {
 		case http.MethodPatch:
 			implemetation.UpdateBanner(w, req)
