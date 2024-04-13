@@ -23,6 +23,8 @@ func NewBannerRepo(database db.PGX) *BannerRepo {
 // "Banner not found", это означает, что сервер не смог найти баннер, который соответствует заданным критериям (тэг и фича) и который был актуальным в течение последних 5 минут.
 func (r *BannerRepo) GetUserBanner(ctx context.Context, tagID, featureID int64, useLastRevision bool) (*repository.Banner, error) {
 	var banner repository.Banner
+	log.Println(tagID)
+	log.Println(featureID)
 
 	var query string
 	if useLastRevision {
@@ -30,7 +32,7 @@ func (r *BannerRepo) GetUserBanner(ctx context.Context, tagID, featureID int64, 
     SELECT b.id, ARRAY_AGG(ft.tag_id) AS tag_ids, ft.feature_id, b.content, b.is_active, b.created_at, b.updated_at
     FROM banners b
     INNER JOIN featuretag ft ON b.id = ft.banner_id
-    WHERE ft.tag_id = $1 AND ft.feature_id = $2 AND b.is_active = TRUE
+    WHERE ft.tag_id = $1 AND ft.feature_id = $2
     GROUP BY b.id, ft.feature_id, b.content, b.is_active, b.created_at, b.updated_at
     ORDER BY b.updated_at DESC
     LIMIT 1
@@ -40,7 +42,7 @@ func (r *BannerRepo) GetUserBanner(ctx context.Context, tagID, featureID int64, 
 		query = `SELECT b.id, ARRAY_AGG(ft.tag_id) AS tag_ids, ft.feature_id, b.content, b.is_active, b.created_at, b.updated_at
 FROM banners b
 INNER JOIN featuretag ft ON b.id = ft.banner_id
-WHERE ft.tag_id = $1 AND ft.feature_id = $2 AND b.is_active = TRUE AND b.updated_at >= NOW() - INTERVAL '5 minutes'
+WHERE ft.tag_id = $1 AND ft.feature_id = $2 AND b.updated_at >= NOW() - INTERVAL '5 minutes'
 GROUP BY b.id, ft.feature_id, b.content, b.is_active, b.created_at, b.updated_at
 ORDER BY b.updated_at DESC
 LIMIT 1

@@ -26,19 +26,20 @@ type BannerResponse struct {
 }
 
 func (s *Server1) GetUserBanner(w http.ResponseWriter, req *http.Request) {
-
 	// Извлечение параметров запроса
 	tagID, err := strconv.ParseInt(req.URL.Query().Get("tag_id"), 10, 64)
 	if err != nil {
 		http.Error(w, "Invalid tag ID", http.StatusBadRequest)
 		return
 	}
+	log.Println(tagID)
 
 	featureID, err := strconv.ParseInt(req.URL.Query().Get("feature_id"), 10, 64)
 	if err != nil {
 		http.Error(w, "Invalid feature ID", http.StatusBadRequest)
 		return
 	}
+	log.Println(featureID)
 
 	useLastRevision, err := strconv.ParseBool(req.URL.Query().Get("use_last_revision"))
 	if err != nil {
@@ -55,6 +56,16 @@ func (s *Server1) GetUserBanner(w http.ResponseWriter, req *http.Request) {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 		}
 		return
+	}
+
+	// Проверка активности баннера
+	if !banner.IsActive {
+		// Если баннер неактивен, проверяем наличие токена администратора
+		adminToken := req.Header.Get("token")
+		if adminToken != "admin_token" {
+			http.Error(w, "Banner is not active", http.StatusNotFound)
+			return
+		}
 	}
 
 	// Отправка баннера в формате JSON
