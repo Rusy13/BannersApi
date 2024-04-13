@@ -4,6 +4,7 @@ import (
 	"Avito/internal/config"
 	api "Avito/internal/delivery/handlers"
 	routes "Avito/internal/delivery/routes"
+	initial "Avito/internal/infrastructure/kafka/initialization"
 	"Avito/internal/storage/db"
 	pp "Avito/internal/storage/repository/postgresql"
 	"context"
@@ -18,6 +19,15 @@ const (
 )
 
 func Run() {
+	var brokers = []string{
+		"127.0.0.1:9091",
+		"127.0.0.1:9092",
+	}
+	//
+	//api.ConsumerGroupExample(brokers)
+	//go func() {
+	//api.ConsumerGroupExample(brokers)
+	//}()
 
 	//port, err := strconv.Atoi(os.Getenv("PORT"))
 	//if err != nil {
@@ -51,6 +61,10 @@ func Run() {
 
 	bannerRepo := pp.NewBannerRepo(database)
 	implementation := api.Server1{Repo: bannerRepo}
+
+	go func() {
+		initial.ConsumerGroupExample(brokers, bannerRepo)
+	}()
 
 	go serveSecure(implementation)
 	serveInsecure()

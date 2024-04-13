@@ -2,6 +2,7 @@ package handlers
 
 import (
 	errs "Avito/internal/config/errors"
+	initial "Avito/internal/infrastructure/kafka/initialization"
 	"Avito/internal/storage/repository"
 	"encoding/json"
 	"errors"
@@ -182,6 +183,77 @@ func (s *Server1) DeleteBanner(w http.ResponseWriter, req *http.Request) {
 		//}
 		return
 	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server1) DeleteByFeatureIDHandler(w http.ResponseWriter, req *http.Request) {
+	token := req.Header.Get("token")
+	if token != "admin_token" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	//vars := mux.Vars(req)
+	//bannerID, _ := strconv.ParseInt(vars["id"], 10, 64)
+
+	// You need to implement this function to delete the banner
+	//err := s.Repo.DeleteBanner(req.Context(), bannerID)
+	var brokers = []string{
+		//"kafka1",
+		//"kafka2",
+		//"kafka3",
+		"127.0.0.1:9091",
+		"127.0.0.1:9092",
+	}
+	//kafkaBrokers := os.Getenv("KAFKA_BROKERS")
+	//if kafkaBrokers == "" {
+	//	log.Println("KAFKA_BROKERS is not set")
+	//	return
+	//}
+
+	//brokers := strings.Split(kafkaBrokers, ",")
+	initial.ProducerExample(brokers, req.URL.Path, req.Method)
+
+}
+
+func (s *Server1) DeleteByTagIDHandler(w http.ResponseWriter, req *http.Request) {
+	token := req.Header.Get("token")
+	if token != "admin_token" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	//vars := mux.Vars(req)
+	//tagID, _ := strconv.ParseInt(vars["id"], 10, 64)
+
+	// You need to implement this function to delete the banner
+	//err := s.Repo.DeleteBanner(req.Context(), tagID)
+	var brokers = []string{
+		//"kafka1",
+		//"kafka2",
+		//"kafka3",
+		"127.0.0.1:9091",
+		"127.0.0.1:9092",
+	}
+	//kafkaBrokers := os.Getenv("KAFKA_BROKERS")
+	//if kafkaBrokers == "" {
+	//	log.Println("KAFKA_BROKERS is not set")
+	//	return
+	//}
+
+	//brokers := strings.Split(kafkaBrokers, ",")
+	initial.ProducerExample(brokers, req.URL.Path, req.Method)
+	//if err != nil {
+	//	http.Error(w, "Эхх", http.StatusBadRequest)
+	//switch {
+	//case errors.Is(err, repository.ErrBannerNotFound):
+	//	http.Error(w, "Banner not found", http.StatusNotFound)
+	//default:
+	//	http.Error(w, "Internal server error", http.StatusInternalServerError)
+	//}
+	//return
+	//}
 
 	w.WriteHeader(http.StatusNoContent)
 }

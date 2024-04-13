@@ -170,3 +170,106 @@ func (r *BannerRepo) DeleteBanner(ctx context.Context, bannerID int64) error {
 
 	return nil
 }
+
+// ------------------------------------------
+func (r *BannerRepo) DeleteByFeatureIDHandler(ctx context.Context, id int64) error {
+	// Начинаем транзакцию
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			tx.Rollback(ctx)
+		}
+	}()
+	log.Println("DeleteByFeatureIDHandler")
+
+	// Находим все banner_id, связанные с feature_id
+	bannerIDs := []int64{}
+	rows, err := tx.Query(ctx, `SELECT banner_id FROM featuretag WHERE feature_id = $1`, id)
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var bannerID int64
+		if err := rows.Scan(&bannerID); err != nil {
+			rows.Close()
+			return err
+		}
+		bannerIDs = append(bannerIDs, bannerID)
+	}
+	rows.Close()
+
+	// Удаляем связанные записи из таблицы featuretag
+	_, err = tx.Exec(ctx, `DELETE FROM featuretag WHERE feature_id = $1`, id)
+	if err != nil {
+		return err
+	}
+
+	// Удаляем связанные баннеры из таблицы banners
+	for _, bannerID := range bannerIDs {
+		_, err = tx.Exec(ctx, `DELETE FROM banners WHERE id = $1`, bannerID)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Фиксируем транзакцию
+	if err := tx.Commit(ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// -----------------------------------------------------
+func (r *BannerRepo) DeleteByTagIDHandler(ctx context.Context, id int64) error {
+	// Начинаем транзакцию
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			tx.Rollback(ctx)
+		}
+	}()
+
+	// Находим все banner_id, связанные с feature_id
+	tagIDs := []int64{}
+	rows, err := tx.Query(ctx, `SELECT banner_id FROM featuretag WHERE tag_id = $1`, id)
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var tagID int64
+		if err := rows.Scan(&tagID); err != nil {
+			rows.Close()
+			return err
+		}
+		tagIDs = append(tagIDs, tagID)
+	}
+	rows.Close()
+
+	// Удаляем связанные записи из таблицы featuretag
+	_, err = tx.Exec(ctx, `DELETE FROM featuretag WHERE tag_id = $1`, id)
+	if err != nil {
+		return err
+	}
+
+	// Удаляем связанные баннеры из таблицы banners
+	for _, tagID := range tagIDs {
+		_, err = tx.Exec(ctx, `DELETE FROM banners WHERE id = $1`, tagID)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Фиксируем транзакцию
+	if err := tx.Commit(ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
