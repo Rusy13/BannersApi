@@ -60,7 +60,7 @@ func Run() {
 	defer database.GetPool(ctx).Close()
 
 	bannerRepo := pp.NewBannerRepo(database)
-	implementation := api.Server1{Repo: bannerRepo}
+	implementation := api.Server1{Serv: bannerRepo}
 
 	go func() {
 		initial.ConsumerGroupExample(brokers, bannerRepo)

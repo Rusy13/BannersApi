@@ -3,6 +3,7 @@ package handlers
 import (
 	errs "Avito/internal/config/errors"
 	initial "Avito/internal/infrastructure/kafka/initialization"
+	"Avito/internal/service"
 	"Avito/internal/storage/repository"
 	"encoding/json"
 	"errors"
@@ -14,7 +15,7 @@ import (
 )
 
 type Server1 struct {
-	Repo repository.BannerRepo
+	Serv service.BannerServ
 }
 
 type BannerResponse struct {
@@ -58,7 +59,7 @@ func (s *Server1) GetUserBanner(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	banner, err = s.Repo.GetUserBanner(req.Context(), tagID, featureID, useLastRevision)
+	banner, err = s.Serv.GetUserBanner(req.Context(), tagID, featureID, useLastRevision)
 	if err != nil {
 		log.Println("Error fetching user banner:", err) // Добавленная строка
 		if errors.Is(err, errs.ErrBannerNotFound) {
@@ -112,7 +113,7 @@ func (s *Server1) GetBanners(w http.ResponseWriter, req *http.Request) {
 	limit, _ := strconv.Atoi(req.URL.Query().Get("limit"))
 	offset, _ := strconv.Atoi(req.URL.Query().Get("offset"))
 
-	banners, err := s.Repo.GetBanners(req.Context(), featureID, tagID, limit, offset)
+	banners, err := s.Serv.GetBanners(req.Context(), featureID, tagID, limit, offset)
 	if err != nil {
 		http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
 		return
@@ -135,7 +136,7 @@ func (s *Server1) CreateBanner(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	bannerID, err := s.Repo.CreateBanner(req.Context(), &banner)
+	bannerID, err := s.Serv.CreateBanner(req.Context(), &banner)
 	if err != nil {
 		http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
 		return
@@ -163,21 +164,21 @@ func (s *Server1) UpdateBanner(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// Получение текущей версии баннера
-	currentBanner, err := s.Repo.GetBanner(req.Context(), bannerID)
+	currentBanner, err := s.Serv.GetBanner(req.Context(), bannerID)
 	if err != nil {
 		http.Error(w, "Внутренняя ошибка сервера: Failed to get current banner", http.StatusInternalServerError)
 		return
 	}
 
 	// Проверка, что количество версий баннера не превышает максимальное значение
-	versions, err := s.Repo.GetBannerVersionsCount(req.Context(), bannerID)
+	versions, err := s.Serv.GetBannerVersionsCount(req.Context(), bannerID)
 	if err != nil {
 		http.Error(w, "Внутренняя ошибка сервера: Failed to get banner versions count", http.StatusInternalServerError)
 		return
 	}
 	if versions >= 3 {
 		// Удаление самой старой версии баннера
-		err := s.Repo.DeleteOldestBannerVersion(req.Context(), bannerID)
+		err := s.Serv.DeleteOldestBannerVersion(req.Context(), bannerID)
 		if err != nil {
 			http.Error(w, "Внутренняя ошибка сервера: Failed to delete oldest banner version", http.StatusInternalServerError)
 			return
@@ -185,21 +186,21 @@ func (s *Server1) UpdateBanner(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// Запись предыдущей версии баннера в таблицу banner_versions
-	err = s.Repo.CreateBannerVersion(req.Context(), currentBanner)
+	err = s.Serv.CreateBannerVersion(req.Context(), currentBanner)
 	if err != nil {
 		http.Error(w, "Внутренняя ошибка сервера: Failed to create banner version", http.StatusInternalServerError)
 		return
 	}
 
 	// Обновление баннера
-	err = s.Repo.UpdateBanner(req.Context(), bannerID, &banner)
+	err = s.Serv.UpdateBanner(req.Context(), bannerID, &banner)
 	if err != nil {
 		http.Error(w, "Внутренняя ошибка сервера: Failed to update banner", http.StatusInternalServerError)
 		return
 	}
 
 	// Обновление связанных тегов
-	err = s.Repo.UpdateFeatureTags(req.Context(), bannerID, banner.FeatureID, banner.TagIDs)
+	err = s.Serv.UpdateFeatureTags(req.Context(), bannerID, banner.FeatureID, banner.TagIDs)
 	if err != nil {
 		http.Error(w, "Внутренняя ошибка сервера: Failed to update feature tags", http.StatusInternalServerError)
 		return
@@ -218,7 +219,7 @@ func (s *Server1) DeleteBanner(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 	bannerID, _ := strconv.ParseInt(vars["id"], 10, 64)
 
-	err := s.Repo.DeleteBanner(req.Context(), bannerID)
+	err := s.Serv.DeleteBanner(req.Context(), bannerID)
 	if err != nil {
 		switch {
 		case errors.Is(err, errs.ErrBannerNotFound):
@@ -249,7 +250,7 @@ func (s *Server1) GetVersionHandler(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 	id, _ := strconv.ParseInt(vars["id"], 10, 64)
 
-	banners, err := s.Repo.GetVersionHandler(req.Context(), id)
+	banners, err := s.Serv.GetVersionHandler(req.Context(), id)
 	if err != nil {
 		log.Println("Err", err)
 		switch {
@@ -271,7 +272,7 @@ func (s *Server1) ApplyVersionHandler(w http.ResponseWriter, req *http.Request) 
 	id, _ := strconv.ParseInt(vars["id"], 10, 64)
 	version, _ := strconv.ParseInt(vars["version_number"], 10, 64)
 
-	err := s.Repo.ApplyVersionHandler(req.Context(), id, version)
+	err := s.Serv.ApplyVersionHandler(req.Context(), id, version)
 	if err != nil {
 		switch {
 		case errors.Is(err, errs.ErrBannerNotFound):
