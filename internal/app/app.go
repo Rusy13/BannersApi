@@ -66,6 +66,8 @@ func Run() {
 		initial.ConsumerGroupExample(brokers, bannerRepo)
 	}()
 
+	//Cache := memcache.New("localhost:11211")
+
 	go serveSecure(implementation)
 	serveInsecure()
 }

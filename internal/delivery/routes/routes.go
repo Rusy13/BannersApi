@@ -42,7 +42,7 @@ func CreateRouter(implemetation handlers.Server1) *mux.Router {
 	router.HandleFunc("/banner/feature/{id}", func(w http.ResponseWriter, req *http.Request) {
 		switch req.Method {
 		case http.MethodDelete:
-			implemetation.DeleteByFeatureIDHandler(w, req)
+			implemetation.DeleteByFeatureTagIDHandler(w, req)
 		default:
 			fmt.Println("error")
 		}
@@ -50,7 +50,7 @@ func CreateRouter(implemetation handlers.Server1) *mux.Router {
 	router.HandleFunc("/banner/tag/{id}", func(w http.ResponseWriter, req *http.Request) {
 		switch req.Method {
 		case http.MethodDelete:
-			implemetation.DeleteByTagIDHandler(w, req)
+			implemetation.DeleteByFeatureTagIDHandler(w, req)
 		default:
 			fmt.Println("error")
 		}

@@ -6,6 +6,7 @@ import (
 	"Avito/internal/storage/repository"
 	"encoding/json"
 	"errors"
+	"github.com/bradfitz/gomemcache/memcache"
 	"github.com/gorilla/mux"
 	"log"
 	"net/http"
@@ -43,12 +44,34 @@ func (s *Server1) GetUserBanner(w http.ResponseWriter, req *http.Request) {
 	log.Println(featureID)
 
 	useLastRevision, err := strconv.ParseBool(req.URL.Query().Get("use_last_revision"))
+	log.Println(useLastRevision)
 	if err != nil {
 		useLastRevision = false
 	}
+	//-----------------------------------------------------------------------------------------
+	var banner *repository.Banner
+	cache := memcache.New("localhost:11211")
+	//проверка кэша
+	// Получаем все ключи из кеша------------------------------------
+	// Получаем все элементы из кеша
+
+	//конец проверки-------------------------------------------
+	cacheKey := "banner_" + strconv.Itoa(int(tagID)) + "_" + strconv.Itoa(int(featureID))
+	if useLastRevision == false {
+		item, err := cache.Get(cacheKey)
+		log.Println("ERR", err)
+		if err == nil {
+			// Используем данные из кеша
+			err := json.Unmarshal(item.Value, &banner)
+			log.Println("Используем данные из кеша")
+			if err != nil {
+				log.Println("Ошибка Unmarshal кэша")
+			}
+		}
+	}
 
 	// Получение баннера пользователя из репозитория
-	banner, err := s.Repo.GetUserBanner(req.Context(), tagID, featureID, useLastRevision)
+	banner, err = s.Repo.GetUserBanner(req.Context(), tagID, featureID, useLastRevision)
 	if err != nil {
 		log.Println("Error fetching user banner:", err) // Добавленная строка
 		if errors.Is(err, errs.ErrBannerNotFound) {
@@ -58,6 +81,14 @@ func (s *Server1) GetUserBanner(w http.ResponseWriter, req *http.Request) {
 		}
 		return
 	}
+
+	// Сохраняем информацию в кеше
+	jsonBytes, err := json.Marshal(banner)
+	if err != nil {
+		log.Println("Ошибка записи в кэш")
+	}
+	cache.Set(&memcache.Item{Key: cacheKey, Value: jsonBytes, Expiration: 5 * 60}) // Время жизни кеша 5 минут
+	log.Println("Баннер сохранен в кэш:", cacheKey)
 
 	// Проверка активности баннера
 	if !banner.IsActive {
@@ -187,18 +218,13 @@ func (s *Server1) DeleteBanner(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *Server1) DeleteByFeatureIDHandler(w http.ResponseWriter, req *http.Request) {
+func (s *Server1) DeleteByFeatureTagIDHandler(w http.ResponseWriter, req *http.Request) {
 	token := req.Header.Get("token")
 	if token != "admin_token" {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	//vars := mux.Vars(req)
-	//bannerID, _ := strconv.ParseInt(vars["id"], 10, 64)
-
-	// You need to implement this function to delete the banner
-	//err := s.Repo.DeleteBanner(req.Context(), bannerID)
 	var brokers = []string{
 		//"kafka1",
 		//"kafka2",
@@ -206,54 +232,7 @@ func (s *Server1) DeleteByFeatureIDHandler(w http.ResponseWriter, req *http.Requ
 		"127.0.0.1:9091",
 		"127.0.0.1:9092",
 	}
-	//kafkaBrokers := os.Getenv("KAFKA_BROKERS")
-	//if kafkaBrokers == "" {
-	//	log.Println("KAFKA_BROKERS is not set")
-	//	return
-	//}
 
-	//brokers := strings.Split(kafkaBrokers, ",")
 	initial.ProducerExample(brokers, req.URL.Path, req.Method)
 
-}
-
-func (s *Server1) DeleteByTagIDHandler(w http.ResponseWriter, req *http.Request) {
-	token := req.Header.Get("token")
-	if token != "admin_token" {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	//vars := mux.Vars(req)
-	//tagID, _ := strconv.ParseInt(vars["id"], 10, 64)
-
-	// You need to implement this function to delete the banner
-	//err := s.Repo.DeleteBanner(req.Context(), tagID)
-	var brokers = []string{
-		//"kafka1",
-		//"kafka2",
-		//"kafka3",
-		"127.0.0.1:9091",
-		"127.0.0.1:9092",
-	}
-	//kafkaBrokers := os.Getenv("KAFKA_BROKERS")
-	//if kafkaBrokers == "" {
-	//	log.Println("KAFKA_BROKERS is not set")
-	//	return
-	//}
-
-	//brokers := strings.Split(kafkaBrokers, ",")
-	initial.ProducerExample(brokers, req.URL.Path, req.Method)
-	//if err != nil {
-	//	http.Error(w, "Эхх", http.StatusBadRequest)
-	//switch {
-	//case errors.Is(err, repository.ErrBannerNotFound):
-	//	http.Error(w, "Banner not found", http.StatusNotFound)
-	//default:
-	//	http.Error(w, "Internal server error", http.StatusInternalServerError)
-	//}
-	//return
-	//}
-
-	w.WriteHeader(http.StatusNoContent)
 }

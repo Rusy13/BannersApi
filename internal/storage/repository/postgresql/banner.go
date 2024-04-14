@@ -26,28 +26,16 @@ func (r *BannerRepo) GetUserBanner(ctx context.Context, tagID, featureID int64, 
 	log.Println(tagID)
 	log.Println(featureID)
 
-	var query string
-	if useLastRevision {
-		query = `
-    SELECT b.id, ARRAY_AGG(ft.tag_id) AS tag_ids, ft.feature_id, b.content, b.is_active, b.created_at, b.updated_at
-    FROM banners b
-    INNER JOIN featuretag ft ON b.id = ft.banner_id
-    WHERE ft.tag_id = $1 AND ft.feature_id = $2
-    GROUP BY b.id, ft.feature_id, b.content, b.is_active, b.created_at, b.updated_at
-    ORDER BY b.updated_at DESC
-    LIMIT 1
-`
-
-	} else {
-		query = `SELECT b.id, ARRAY_AGG(ft.tag_id) AS tag_ids, ft.feature_id, b.content, b.is_active, b.created_at, b.updated_at
-FROM banners b
-INNER JOIN featuretag ft ON b.id = ft.banner_id
-WHERE ft.tag_id = $1 AND ft.feature_id = $2 AND b.updated_at >= NOW() - INTERVAL '5 minutes'
-GROUP BY b.id, ft.feature_id, b.content, b.is_active, b.created_at, b.updated_at
-ORDER BY b.updated_at DESC
-LIMIT 1
-`
-	}
+	// Запрос для выбора баннера по tag_id и feature_id
+	query := `
+        SELECT b.id, ARRAY_AGG(ft.tag_id) AS tag_ids, ft.feature_id, b.content, b.is_active, b.created_at, b.updated_at
+        FROM banners b
+        INNER JOIN featuretag ft ON b.id = ft.banner_id
+        WHERE ft.tag_id = $1 AND ft.feature_id = $2
+        GROUP BY b.id, ft.feature_id, b.content, b.is_active, b.created_at, b.updated_at
+        ORDER BY b.updated_at DESC
+        LIMIT 1
+    `
 
 	err := r.db.Get(ctx, &banner, query, tagID, featureID)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -232,9 +220,12 @@ func (r *BannerRepo) DeleteByTagIDHandler(ctx context.Context, id int64) error {
 	}
 	defer func() {
 		if err != nil {
+			log.Println("Rolling back transaction...")
 			tx.Rollback(ctx)
 		}
 	}()
+
+	log.Println("DeleteByTagIDHandler")
 
 	// Находим все banner_id, связанные с feature_id
 	tagIDs := []int64{}
@@ -242,34 +233,34 @@ func (r *BannerRepo) DeleteByTagIDHandler(ctx context.Context, id int64) error {
 	if err != nil {
 		return err
 	}
+	defer rows.Close() // Убедимся, что строки будут закрыты после использования
 	for rows.Next() {
-		var tagID int64
-		if err := rows.Scan(&tagID); err != nil {
-			rows.Close()
+		var bannerID int64
+		if err := rows.Scan(&bannerID); err != nil {
 			return err
 		}
-		tagIDs = append(tagIDs, tagID)
+		tagIDs = append(tagIDs, bannerID)
 	}
-	rows.Close()
 
 	// Удаляем связанные записи из таблицы featuretag
-	_, err = tx.Exec(ctx, `DELETE FROM featuretag WHERE tag_id = $1`, id)
-	if err != nil {
+	if _, err := tx.Exec(ctx, `DELETE FROM featuretag WHERE tag_id = $1`, id); err != nil {
 		return err
 	}
 
 	// Удаляем связанные баннеры из таблицы banners
 	for _, tagID := range tagIDs {
-		_, err = tx.Exec(ctx, `DELETE FROM banners WHERE id = $1`, tagID)
-		if err != nil {
+		log.Println("Deleting banner with ID:", tagID)
+		if _, err := tx.Exec(ctx, `DELETE FROM banners WHERE id = $1`, tagID); err != nil {
 			return err
 		}
 	}
 
 	// Фиксируем транзакцию
+	log.Println("Committing transaction...")
 	if err := tx.Commit(ctx); err != nil {
 		return err
 	}
 
+	log.Println("Transaction committed successfully!")
 	return nil
 }
