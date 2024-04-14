@@ -55,5 +55,15 @@ func CreateRouter(implemetation handlers.Server1) *mux.Router {
 			fmt.Println("error")
 		}
 	})
+	//router.HandleFunc("/banner/version/{id}/{version_number}", func(w http.ResponseWriter, req *http.Request) {
+	//	switch req.Method {
+	//	case http.MethodGet:
+	//		implemetation.GetVersionHandler(w, req)
+	//	case http.MethodPost:
+	//		implemetation.ApplyVersionHandler(w, req)
+	//	default:
+	//		fmt.Println("error")
+	//	}
+	//})
 	return router
 }

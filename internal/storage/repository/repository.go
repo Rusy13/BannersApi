@@ -11,4 +11,11 @@ type BannerRepo interface {
 	UpdateFeatureTags(ctx context.Context, bannerID int64, featureID int, tagIDs []int) error
 	DeleteByFeatureIDHandler(ctx context.Context, bannerID int64) error
 	DeleteByTagIDHandler(ctx context.Context, bannerID int64) error
+	GetBanner(ctx context.Context, bannerID int64) (*Banner, error)
+	GetBannerVersionsCount(ctx context.Context, bannerID int64) (int, error)
+	CreateBannerVersion(ctx context.Context, banner *Banner) error
+	DeleteOldestBannerVersion(ctx context.Context, bannerID int64) error
+	//GetVersionHandler(ctx context.Context, bannerID int64, bannerVersion int64) error
+	//ApplyVersionHandler(ctx context.Context, bannerID int64, bannerVersion int64) error
+
 }

@@ -234,3 +234,97 @@ func (r *BannerRepo) DeleteByTagIDHandler(ctx context.Context, id int64) error {
 	log.Println("Transaction committed successfully!")
 	return nil
 }
+
+func (r *BannerRepo) GetBanner(ctx context.Context, bannerID int64) (*repository.Banner, error) {
+	var banner repository.Banner
+	query := `
+		SELECT id, content, is_active, created_at, updated_at
+		FROM banners
+		WHERE id = $1
+	`
+
+	err := r.db.Get(ctx, &banner, query, bannerID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &banner, nil
+}
+
+func (r *BannerRepo) GetBannerVersionsCount(ctx context.Context, bannerID int64) (int, error) {
+	var count int
+	query := `
+		SELECT COUNT(*)
+		FROM banner_versions
+		WHERE banner_id = $1
+	`
+
+	err := r.db.Get(ctx, &count, query, bannerID)
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func (r *BannerRepo) CreateBannerVersion(ctx context.Context, banner *repository.Banner) error {
+	query := `
+		INSERT INTO banner_versions (banner_id, version_number, content, is_active, created_at)
+VALUES ($1, (SELECT COALESCE(MAX(version_number), 0) + 1 FROM banner_versions WHERE banner_id = $1), $2, $3, $4)
+
+	`
+
+	_, err := r.db.Exec(ctx, query, banner.ID, banner.Content, banner.IsActive, banner.CreatedAt)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *BannerRepo) DeleteOldestBannerVersion(ctx context.Context, bannerID int64) error {
+	// Находим ID самой старой версии баннера
+	var oldestVersionID int64
+	query := `SELECT id FROM banner_versions WHERE banner_id = $1 ORDER BY created_at ASC LIMIT 1`
+
+	err := r.db.Get(ctx, &oldestVersionID, query, bannerID)
+	if err != nil {
+		return err
+	}
+
+	// Удаляем самую старую версию баннера
+	_, err = r.db.Exec(ctx, "DELETE FROM banner_versions WHERE id = $1", oldestVersionID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+//func (r *BannerRepo) GetVersionHandler(ctx context.Context, featureID, tagID int64, limit, offset int) ([]*repository.Banner, error) {
+//	var banners []*repository.Banner
+//	query := `
+//SELECT
+//`
+//
+//	err := r.db.Select(ctx, &banners, query, featureID, tagID, limit, offset)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	return banners, nil
+//}
+//
+//func (r *BannerRepo) ApplyVersionHandler(ctx context.Context, featureID, tagID int64, limit, offset int) ([]*repository.Banner, error) {
+//	var banners []*repository.Banner
+//	query := `
+//SELECT
+//`
+//
+//	err := r.db.Select(ctx, &banners, query, featureID, tagID, limit, offset)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	return banners, nil
+//}

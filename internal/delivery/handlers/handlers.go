@@ -162,12 +162,43 @@ func (s *Server1) UpdateBanner(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	err := s.Repo.UpdateBanner(req.Context(), bannerID, &banner)
+	// Получение текущей версии баннера
+	currentBanner, err := s.Repo.GetBanner(req.Context(), bannerID)
+	if err != nil {
+		http.Error(w, "Внутренняя ошибка сервера: Failed to get current banner", http.StatusInternalServerError)
+		return
+	}
+
+	// Проверка, что количество версий баннера не превышает максимальное значение
+	versions, err := s.Repo.GetBannerVersionsCount(req.Context(), bannerID)
+	if err != nil {
+		http.Error(w, "Внутренняя ошибка сервера: Failed to get banner versions count", http.StatusInternalServerError)
+		return
+	}
+	if versions >= 3 {
+		// Удаление самой старой версии баннера
+		err := s.Repo.DeleteOldestBannerVersion(req.Context(), bannerID)
+		if err != nil {
+			http.Error(w, "Внутренняя ошибка сервера: Failed to delete oldest banner version", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// Запись предыдущей версии баннера в таблицу banner_versions
+	err = s.Repo.CreateBannerVersion(req.Context(), currentBanner)
+	if err != nil {
+		http.Error(w, "Внутренняя ошибка сервера: Failed to create banner version", http.StatusInternalServerError)
+		return
+	}
+
+	// Обновление баннера
+	err = s.Repo.UpdateBanner(req.Context(), bannerID, &banner)
 	if err != nil {
 		http.Error(w, "Внутренняя ошибка сервера: Failed to update banner", http.StatusInternalServerError)
 		return
 	}
 
+	// Обновление связанных тегов
 	err = s.Repo.UpdateFeatureTags(req.Context(), bannerID, banner.FeatureID, banner.TagIDs)
 	if err != nil {
 		http.Error(w, "Внутренняя ошибка сервера: Failed to update feature tags", http.StatusInternalServerError)
@@ -213,3 +244,41 @@ func (s *Server1) DeleteByFeatureTagIDHandler(w http.ResponseWriter, req *http.R
 	}
 	initial.ProducerExample(brokers, req.URL.Path, req.Method)
 }
+
+//func (s *Server1) GetVersionHandler(w http.ResponseWriter, req *http.Request) {
+//	vars := mux.Vars(req)
+//	id, _ := strconv.ParseInt(vars["id"], 10, 64)
+//	version, _ := strconv.ParseInt(vars["version_number"], 10, 64)
+//
+//	err := s.Repo.GetVersionHandler(req.Context(), id, version)
+//	if err != nil {
+//		switch {
+//		case errors.Is(err, errs.ErrBannerNotFound):
+//			http.Error(w, "Баннер не найден", http.StatusNotFound)
+//		default:
+//			http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
+//		}
+//		return
+//	}
+//
+//	w.WriteHeader(http.StatusOK)
+//}
+//
+//func (s *Server1) ApplyVersionHandler(w http.ResponseWriter, req *http.Request) {
+//	vars := mux.Vars(req)
+//	id, _ := strconv.ParseInt(vars["id"], 10, 64)
+//	version, _ := strconv.ParseInt(vars["version_number"], 10, 64)
+//
+//	err := s.Repo.ApplyVersionHandler(req.Context(), id, version)
+//	if err != nil {
+//		switch {
+//		case errors.Is(err, errs.ErrBannerNotFound):
+//			http.Error(w, "Баннер не найден", http.StatusNotFound)
+//		default:
+//			http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
+//		}
+//		return
+//	}
+//
+//	w.WriteHeader(http.StatusOK)
+//}
