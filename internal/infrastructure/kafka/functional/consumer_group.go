@@ -48,7 +48,6 @@ func (consumer *ConsumerGroup) Cleanup(_ sarama.ConsumerGroupSession) error {
 // ConsumeClaim читаем до тех пор пока сессия не завершилась
 func (consumer *ConsumerGroup) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	for {
-		log.Println("qwertu")
 		select {
 		case message := <-claim.Messages():
 
@@ -57,7 +56,6 @@ func (consumer *ConsumerGroup) ConsumeClaim(session sarama.ConsumerGroupSession,
 			if err != nil {
 				fmt.Println("Consumer group error", err)
 			}
-			log.Println(pm.AnswerURL)
 
 			parts := strings.Split(pm.AnswerURL, "/")
 			// Возвращаем первые два компонента пути (или всё, что есть, если менее двух).
@@ -66,8 +64,6 @@ func (consumer *ConsumerGroup) ConsumeClaim(session sarama.ConsumerGroupSession,
 			if err != nil {
 				panic(err)
 			}
-			log.Println(id)
-			log.Println(url)
 
 			if url == "feature" {
 				consumer.Repo.DeleteByFeatureIDHandler(context.Background(), int64(id))
