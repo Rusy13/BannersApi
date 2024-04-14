@@ -245,40 +245,42 @@ func (s *Server1) DeleteByFeatureTagIDHandler(w http.ResponseWriter, req *http.R
 	initial.ProducerExample(brokers, req.URL.Path, req.Method)
 }
 
-//func (s *Server1) GetVersionHandler(w http.ResponseWriter, req *http.Request) {
-//	vars := mux.Vars(req)
-//	id, _ := strconv.ParseInt(vars["id"], 10, 64)
-//	version, _ := strconv.ParseInt(vars["version_number"], 10, 64)
-//
-//	err := s.Repo.GetVersionHandler(req.Context(), id, version)
-//	if err != nil {
-//		switch {
-//		case errors.Is(err, errs.ErrBannerNotFound):
-//			http.Error(w, "Баннер не найден", http.StatusNotFound)
-//		default:
-//			http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
-//		}
-//		return
-//	}
-//
-//	w.WriteHeader(http.StatusOK)
-//}
-//
-//func (s *Server1) ApplyVersionHandler(w http.ResponseWriter, req *http.Request) {
-//	vars := mux.Vars(req)
-//	id, _ := strconv.ParseInt(vars["id"], 10, 64)
-//	version, _ := strconv.ParseInt(vars["version_number"], 10, 64)
-//
-//	err := s.Repo.ApplyVersionHandler(req.Context(), id, version)
-//	if err != nil {
-//		switch {
-//		case errors.Is(err, errs.ErrBannerNotFound):
-//			http.Error(w, "Баннер не найден", http.StatusNotFound)
-//		default:
-//			http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
-//		}
-//		return
-//	}
-//
-//	w.WriteHeader(http.StatusOK)
-//}
+func (s *Server1) GetVersionHandler(w http.ResponseWriter, req *http.Request) {
+	vars := mux.Vars(req)
+	id, _ := strconv.ParseInt(vars["id"], 10, 64)
+
+	banners, err := s.Repo.GetVersionHandler(req.Context(), id)
+	if err != nil {
+		log.Println("Err", err)
+		switch {
+		case errors.Is(err, errs.ErrBannerNotFound):
+			http.Error(w, "Баннер не найден", http.StatusNotFound)
+		default:
+			http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// Отправка баннеров в формате JSON
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(banners)
+}
+
+func (s *Server1) ApplyVersionHandler(w http.ResponseWriter, req *http.Request) {
+	vars := mux.Vars(req)
+	id, _ := strconv.ParseInt(vars["id"], 10, 64)
+	version, _ := strconv.ParseInt(vars["version_number"], 10, 64)
+
+	err := s.Repo.ApplyVersionHandler(req.Context(), id, version)
+	if err != nil {
+		switch {
+		case errors.Is(err, errs.ErrBannerNotFound):
+			http.Error(w, "Баннер не найден", http.StatusNotFound)
+		default:
+			http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}

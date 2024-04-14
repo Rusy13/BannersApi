@@ -15,7 +15,6 @@ type BannerRepo interface {
 	GetBannerVersionsCount(ctx context.Context, bannerID int64) (int, error)
 	CreateBannerVersion(ctx context.Context, banner *Banner) error
 	DeleteOldestBannerVersion(ctx context.Context, bannerID int64) error
-	//GetVersionHandler(ctx context.Context, bannerID int64, bannerVersion int64) error
-	//ApplyVersionHandler(ctx context.Context, bannerID int64, bannerVersion int64) error
-
+	GetVersionHandler(ctx context.Context, id int64) ([]*BannerVersion, error)
+	ApplyVersionHandler(ctx context.Context, bannerID int64, bannerVersion int64) error
 }

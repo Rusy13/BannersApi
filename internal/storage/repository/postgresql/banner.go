@@ -301,30 +301,77 @@ func (r *BannerRepo) DeleteOldestBannerVersion(ctx context.Context, bannerID int
 	return nil
 }
 
-//func (r *BannerRepo) GetVersionHandler(ctx context.Context, featureID, tagID int64, limit, offset int) ([]*repository.Banner, error) {
-//	var banners []*repository.Banner
-//	query := `
-//SELECT
-//`
-//
-//	err := r.db.Select(ctx, &banners, query, featureID, tagID, limit, offset)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	return banners, nil
-//}
-//
-//func (r *BannerRepo) ApplyVersionHandler(ctx context.Context, featureID, tagID int64, limit, offset int) ([]*repository.Banner, error) {
-//	var banners []*repository.Banner
-//	query := `
-//SELECT
-//`
-//
-//	err := r.db.Select(ctx, &banners, query, featureID, tagID, limit, offset)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	return banners, nil
-//}
+// banner.go
+
+func (r *BannerRepo) GetVersionHandler(ctx context.Context, id int64) ([]*repository.BannerVersion, error) {
+	var banners []*repository.BannerVersion
+	query := `
+SELECT *
+FROM banner_versions
+WHERE banner_id = $1
+`
+
+	err := r.db.Select(ctx, &banners, query, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return banners, nil
+}
+
+func (r *BannerRepo) ApplyVersionHandler(ctx context.Context, id, version int64) error {
+	// Получаем текущую версию баннера
+	var currentBanner repository.Banner
+	currentBannerQuery := `
+SELECT content, is_active, created_at
+FROM banners
+WHERE id = $1
+LIMIT 1
+`
+	err := r.db.Get(ctx, &currentBanner, currentBannerQuery, id)
+	if err != nil {
+		return err
+	}
+
+	// Получаем информацию о выбранной версии баннера
+	var selectedBanner repository.BannerVersion
+	selectedBannerQuery := `
+SELECT banner_id, version_number, content, is_active, created_at
+FROM banner_versions
+WHERE banner_id = $1 AND version_number = $2
+`
+	err = r.db.Get(ctx, &selectedBanner, selectedBannerQuery, id, version)
+	if err != nil {
+		return err
+	}
+
+	// Обновляем текущую версию баннера
+	updateCurrentBannerQuery := `
+UPDATE banners
+SET content = $1, is_active = $2, updated_at = CURRENT_TIMESTAMP
+WHERE id = $3
+`
+	_, err = r.db.Exec(ctx, updateCurrentBannerQuery, selectedBanner.Content, selectedBanner.IsActive, selectedBanner.BannerID)
+	if err != nil {
+		return err
+	}
+
+	// Обновляем выбранную версию баннера, чтобы она стала текущей версией
+	updateSelectedBannerQuery := `
+UPDATE banner_versions
+SET content = $1, is_active = $2, created_at = $3
+WHERE banner_id = $4 AND version_number = $5
+`
+	log.Println("currentBanner.Content", currentBanner.Content)
+	log.Println("currentBanner.IsActive", currentBanner.IsActive)
+	log.Println("currentBanner.CreatedAt", currentBanner.CreatedAt)
+	log.Println("selectedBanner.BannerID", selectedBanner.BannerID)
+	log.Println("selectedBanner.Version", selectedBanner.Version)
+
+	_, err = r.db.Exec(ctx, updateSelectedBannerQuery, currentBanner.Content, currentBanner.IsActive, currentBanner.CreatedAt, selectedBanner.BannerID, selectedBanner.Version)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
