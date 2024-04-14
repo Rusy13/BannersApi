@@ -1,5 +1,5 @@
 ifeq ($(POSTGRES_SETUP_TEST),)
-    POSTGRES_SETUP_TEST := user=postgres password=1111 dbname=TestAvito host=localhost port=5432 sslmode=disable
+    POSTGRES_SETUP_TEST := user=postgres password=1111 dbname=TestAvito host=localhost port=5433 sslmode=disable
 endif
 
 ifeq ($(POSTGRES_SETUP),)

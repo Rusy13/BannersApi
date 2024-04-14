@@ -87,29 +87,57 @@ func (r *BannerRepo) CreateBanner(ctx context.Context, banner *repository.Banner
 }
 
 func (r *BannerRepo) UpdateBanner(ctx context.Context, bannerID int64, banner *repository.Banner) error {
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			tx.Rollback(ctx)
+		}
+	}()
+
 	query := `
-		UPDATE banners
-		SET content = $1, is_active = $2, updated_at = $3
-		WHERE id = $4
-	`
-	_, err := r.db.Exec(ctx, query, banner.Content, banner.IsActive, time.Now(), bannerID)
-	return err
+        UPDATE banners
+        SET content = $1, is_active = $2, updated_at = $3
+        WHERE id = $4
+    `
+	_, err = tx.Exec(ctx, query, banner.Content, banner.IsActive, time.Now(), bannerID)
+	if err != nil {
+		return err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (r *BannerRepo) UpdateFeatureTags(ctx context.Context, bannerID int64, featureID int, tagIDs []int) error {
-	_, err := r.db.Exec(ctx, "DELETE FROM featuretag WHERE banner_id = $1", bannerID)
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	_, err = tx.Exec(ctx, "DELETE FROM featuretag WHERE banner_id = $1", bannerID)
 	if err != nil {
 		return err
 	}
 
 	for _, tagID := range tagIDs {
-		_, err := r.db.Exec(ctx, "INSERT INTO featuretag (feature_id, tag_id, banner_id) VALUES ($1, $2, $3)", featureID, tagID, bannerID)
+		_, err := tx.Exec(ctx, "INSERT INTO featuretag (feature_id, tag_id, banner_id) VALUES ($1, $2, $3)", featureID, tagID, bannerID)
 		if err != nil {
 			return err
 		}
 	}
 
-	return err
+	if err := tx.Commit(ctx); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (r *BannerRepo) DeleteBanner(ctx context.Context, bannerID int64) error {
@@ -187,7 +215,7 @@ func (r *BannerRepo) DeleteByFeatureIDHandler(ctx context.Context, id int64) err
 	return nil
 }
 
-func (r *BannerRepo) DeleteByTagIDHandler(ctx context.Context, id int64) error {
+func (r *BannerRepo) DeleteByTagIDHandler(ctx context.Context, idtag int64) error {
 	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return err
@@ -201,8 +229,14 @@ func (r *BannerRepo) DeleteByTagIDHandler(ctx context.Context, id int64) error {
 
 	log.Println("DeleteByTagIDHandler")
 
-	tagIDs := []int64{}
-	rows, err := tx.Query(ctx, `SELECT banner_id FROM featuretag WHERE tag_id = $1`, id)
+	// Удаляем строки из таблицы featuretag по переданному idtag
+	if _, err := tx.Exec(ctx, `DELETE FROM featuretag WHERE tag_id = $1`, idtag); err != nil {
+		return err
+	}
+
+	// Получаем список id баннеров, связанных с данным тегом
+	bannerIDs := []int64{}
+	rows, err := tx.Query(ctx, `SELECT banner_id FROM featuretag WHERE tag_id = $1`, idtag)
 	if err != nil {
 		return err
 	}
@@ -212,16 +246,13 @@ func (r *BannerRepo) DeleteByTagIDHandler(ctx context.Context, id int64) error {
 		if err := rows.Scan(&bannerID); err != nil {
 			return err
 		}
-		tagIDs = append(tagIDs, bannerID)
+		bannerIDs = append(bannerIDs, bannerID)
 	}
 
-	if _, err := tx.Exec(ctx, `DELETE FROM featuretag WHERE tag_id = $1`, id); err != nil {
-		return err
-	}
-
-	for _, tagID := range tagIDs {
-		log.Println("Deleting banner with ID:", tagID)
-		if _, err := tx.Exec(ctx, `DELETE FROM banners WHERE id = $1`, tagID); err != nil {
+	// Удаляем строки из таблицы banners, связанные с найденными id баннеров
+	for _, bannerID := range bannerIDs {
+		log.Println("Deleting banner with ID:", bannerID)
+		if _, err := tx.Exec(ctx, `DELETE FROM banners WHERE id = $1`, bannerID); err != nil {
 			return err
 		}
 	}
@@ -241,10 +272,22 @@ func (r *BannerRepo) GetBanner(ctx context.Context, bannerID int64) (*repository
 		SELECT id, content, is_active, created_at, updated_at
 		FROM banners
 		WHERE id = $1
+		LIMIT 1
 	`
 
-	err := r.db.Get(ctx, &banner, query, bannerID)
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	row := tx.QueryRow(ctx, query, bannerID)
+	err = row.Scan(&banner.ID, &banner.Content, &banner.IsActive, &banner.CreatedAt, &banner.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
 
@@ -259,8 +302,19 @@ func (r *BannerRepo) GetBannerVersionsCount(ctx context.Context, bannerID int64)
 		WHERE banner_id = $1
 	`
 
-	err := r.db.Get(ctx, &count, query, bannerID)
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback(ctx)
+
+	// Выполняем запрос и получаем результат
+	row := tx.QueryRow(ctx, query, bannerID)
+	if err := row.Scan(&count); err != nil {
+		return 0, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
 		return 0, err
 	}
 
@@ -270,12 +324,21 @@ func (r *BannerRepo) GetBannerVersionsCount(ctx context.Context, bannerID int64)
 func (r *BannerRepo) CreateBannerVersion(ctx context.Context, banner *repository.Banner) error {
 	query := `
 		INSERT INTO banner_versions (banner_id, version_number, content, is_active, created_at)
-VALUES ($1, (SELECT COALESCE(MAX(version_number), 0) + 1 FROM banner_versions WHERE banner_id = $1), $2, $3, $4)
-
+		VALUES ($1, (SELECT COALESCE(MAX(version_number), 0) + 1 FROM banner_versions WHERE banner_id = $1), $2, $3, $4)
 	`
 
-	_, err := r.db.Exec(ctx, query, banner.ID, banner.Content, banner.IsActive, banner.CreatedAt)
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	_, err = tx.Exec(ctx, query, banner.ID, banner.Content, banner.IsActive, banner.CreatedAt)
+	if err != nil {
+		return err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
 		return err
 	}
 
@@ -283,18 +346,31 @@ VALUES ($1, (SELECT COALESCE(MAX(version_number), 0) + 1 FROM banner_versions WH
 }
 
 func (r *BannerRepo) DeleteOldestBannerVersion(ctx context.Context, bannerID int64) error {
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			tx.Rollback(ctx)
+		}
+	}()
+
 	// Находим ID самой старой версии баннера
 	var oldestVersionID int64
 	query := `SELECT id FROM banner_versions WHERE banner_id = $1 ORDER BY created_at ASC LIMIT 1`
-
-	err := r.db.Get(ctx, &oldestVersionID, query, bannerID)
+	err = tx.QueryRow(ctx, query, bannerID).Scan(&oldestVersionID)
 	if err != nil {
 		return err
 	}
 
 	// Удаляем самую старую версию баннера
-	_, err = r.db.Exec(ctx, "DELETE FROM banner_versions WHERE id = $1", oldestVersionID)
+	_, err = tx.Exec(ctx, "DELETE FROM banner_versions WHERE id = $1", oldestVersionID)
 	if err != nil {
+		return err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
 		return err
 	}
 
